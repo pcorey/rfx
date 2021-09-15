@@ -1,5 +1,4 @@
 defmodule Rfx.Ops.Module.RenameModule do
-
   @behaviour Rfx.Ops
 
   @moduledoc """
@@ -38,6 +37,12 @@ defmodule Rfx.Ops.Module.RenameModule do
       about: "Rename Module",
       status: :experimental,
       options: [
+        old_name: [
+          long: "--old_name",
+          value_name: "OLD_NAME",
+          help: "Old Module Name",
+          required: true
+        ],
         new_name: [
           long: "--new_name",
           value_name: "NEW_NAME",
@@ -45,52 +50,55 @@ defmodule Rfx.Ops.Module.RenameModule do
           required: true
         ]
       ]
-    ] 
+    ]
   end
 
   # ----- Changesets -----
 
   @impl true
-  def cl_code(old_source, args =  [old_name: _, new_name: _]) do
+  def cl_code(old_source, args = [new_name: _, old_name: _]) do
     new_source = edit(old_source, args)
-    {:ok, result} = case Source.diff(old_source, new_source) do
-      "" -> {:ok, nil}
-      nil -> {:ok, nil}
-      diff -> Request.new(text_req: [input_text: old_source, diff: diff])
-    end
+
+    {:ok, result} =
+      case Source.diff(old_source, new_source) do
+        "" -> {:ok, nil}
+        nil -> {:ok, nil}
+        diff -> Request.new(text_req: [input_text: old_source, diff: diff])
+      end
+
     [result] |> Enum.reject(&is_nil/1)
   end
 
   @impl true
-  def cl_file(input_file, args = [old_name: _, new_name: _]) do
+  def cl_file(input_file, args = [new_name: _, old_name: _]) do
     input_file
+    |> File.read!()
     |> cl_code(args)
   end
 
   @impl true
-  def cl_project(project_root, args = [old_name: _, new_name: _]) do
+  def cl_project(project_root, args = [new_name: _, old_name: _]) do
     project_root
     |> Rfx.Util.Filesys.project_files()
-    |> Enum.map(&(cl_file(&1, args)))
+    |> Enum.map(&cl_file(&1, args))
     |> List.flatten()
     |> Enum.reject(&is_nil/1)
   end
 
   @impl true
-  def cl_subapp(subapp_root, args = [old_name: _, new_name: _]) do
+  def cl_subapp(subapp_root, args = [new_name: _, old_name: _]) do
     subapp_root
     |> cl_project(args)
   end
 
   @impl true
-  def cl_tmpfile(input_file, args = [old_name: _, new_name: _]) do
-    input_file 
+  def cl_tmpfile(input_file, args = [new_name: _, old_name: _]) do
+    input_file
     |> cl_file(args)
   end
 
   # ----- Edit -----
-  
+
   @impl true
   defdelegate edit(source_code, opts), to: Rfx.Edit.Module.RenameModule
-
 end
